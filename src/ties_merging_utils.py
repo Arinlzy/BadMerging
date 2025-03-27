@@ -83,14 +83,14 @@ def topk_values_mask(M, K=0.7, return_mask=False):
 
     original_shape = M.shape
     if M.dim() == 1:
-        M = M.unsqueeze(0)
+        M = M.unsqueeze(0) # 单模型时添加批次维度
 
-    n, d = M.shape
+    n, d = M.shape #! n=模型数量, d=参数量
     k = int(d * K)
     k = d - k  # Keep top k elements instead of bottom k elements
 
     # Find the k-th smallest element by magnitude for each row
-    kth_values, _ = M.abs().kthvalue(k, dim=1, keepdim=True)
+    kth_values, _ = M.abs().kthvalue(k, dim=1, keepdim=True) #! 计算阈值
     # Create a mask tensor with True for the top k elements in each row
     mask = M.abs() >= kth_values
     final_mask = mask.squeeze() if original_shape == M.squeeze().shape else mask
@@ -111,15 +111,16 @@ def resolve_zero_signs(sign_to_mult, method="majority"):
 
 
 def resolve_sign(Tensor):
-    sign_to_mult = torch.sign(Tensor.sum(dim=0))
-    sign_to_mult = resolve_zero_signs(sign_to_mult, "majority")
+    sign_to_mult = torch.sign(Tensor.sum(dim=0)) #!
+    sign_to_mult = resolve_zero_signs(sign_to_mult, "majority") #! 处理零值符号（当正负更新数量相等时）
     return sign_to_mult
 
 
 def disjoint_merge(Tensor, merge_func, sign_to_mult):
-    merge_func = merge_func.split("-")[-1]
+    merge_func = merge_func.split("-")[-1] #! 解析合并方法（去除前缀，保留核心方法名)
 
     # If sign is provided then we select the corresponding entries and aggregate.
+    #! 根据统一符号方向筛选参数（保留与符号方向一致的参数）
     if sign_to_mult is not None:
         rows_to_keep = torch.where(
             sign_to_mult.unsqueeze(0) > 0, Tensor > 0, Tensor < 0
@@ -150,10 +151,12 @@ def ties_merging(
         merge_func="",
 ):
     all_checks = flat_task_checks.clone()
+    # 参数筛选阶段：保留各模型最重要的参数
     updated_checks, *_ = topk_values_mask(
         all_checks, K=reset_thresh, return_mask=False
     )
     print(f"RESOLVING SIGN")
+     # 符号统一阶段：通过多数表决确定参数符号方向
     final_signs = resolve_sign(updated_checks)
     assert final_signs is not None
 

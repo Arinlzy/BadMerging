@@ -7,9 +7,9 @@ from src.datasets.registry import get_dataset_classnames
 from src.modeling import ClassificationHead, ImageEncoder
 
 def build_classification_head(model, dataset_name, template, data_location, device):
-    template = get_templates(dataset_name)
+    template = get_templates(dataset_name) #! 得到文本模板
 
-    logit_scale = model.logit_scale
+    logit_scale = model.logit_scale #! logit_scale是一个可学习的参数，用于缩放相似度得分，调整到合适的范围，以便计算交叉熵损失。
     classnames = get_dataset_classnames(
         dataset_name,
         None,
@@ -21,10 +21,11 @@ def build_classification_head(model, dataset_name, template, data_location, devi
     print('Building classification head.')
     with torch.no_grad():
         zeroshot_weights = []
-        for classname in tqdm(classnames):
+        # 遍历所有类别生成文本特征权重
+        for classname in tqdm(classnames): #! tqdm 显示进度条
             texts = []
             for t in template:
-                texts.append(t(classname))
+                texts.append(t(classname)) #! 将类别名插入文本模板中，得到一个文本列表，为每个类别创建多样化的文本描述
             texts = open_clip.tokenize(texts).to(device) # tokenize
             embeddings = model.encode_text(texts) # embed with text encoder
             embeddings /= embeddings.norm(dim=-1, keepdim=True)
@@ -38,7 +39,8 @@ def build_classification_head(model, dataset_name, template, data_location, devi
         zeroshot_weights = torch.transpose(zeroshot_weights, 0, 2)
 
         zeroshot_weights *= logit_scale.exp()
-        
+
+        # 调整维度 (dim, 1, n_classes) -> (dim, n_classes)
         zeroshot_weights = zeroshot_weights.squeeze().float()
         zeroshot_weights = torch.transpose(zeroshot_weights, 0, 1)
 

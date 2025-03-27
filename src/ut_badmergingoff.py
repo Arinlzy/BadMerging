@@ -36,7 +36,7 @@ parser.add_argument('--phi', type=int, default=30, help="loss weight")
 parser.add_argument('--seed', type=int, default=300)     
 args = parser.parse_args()
 
-### adversarial data augmentation
+### adversarial data augmentation #!数据扩充部分 已经获得少部分参考图像，已知属于目标类别
 def PGD(idx, image, target, image_encoder, classification_head, normalizer, inv_normalizer, eps=8/255, alpha=1/255, steps=40):
     image = inv_normalizer(image).cuda()
     target = target.cuda()
@@ -55,20 +55,22 @@ def PGD(idx, image, target, image_encoder, classification_head, normalizer, inv_
         grad = torch.autograd.grad(
             cost, adv_image, retain_graph=False, create_graph=False
         )[0]
-        adv_image = adv_image.detach() + alpha * grad.sign()
+        adv_image = adv_image.detach() + alpha * grad.sign() # FGSM单步更新（符号梯度下降）
         delta = torch.clamp(adv_image - image, min=-eps, max=eps)
-        adv_image = torch.clamp(image + delta, min=0, max=1).detach()
+        adv_image = torch.clamp(image + delta, min=0, max=1).detach() # 投影到扰动允许范围（L∞范数约束）通过eps参数控制最大扰动范围（8/255 ≈ 0.03
 
+        # 验证当前对抗样本
         feature = image_encoder(normalizer(adv_image))
-        output = classification_head(feature)
+        output = classification_head(feature) # 前向传播：对抗样本→归一化→图像编码→分类头
         pred = output.argmax(dim=1, keepdim=True)
+        # 记录最小扰动且预测正确的样本
         if torch.sum(torch.abs(adv_image-image)).item()<best_delta and pred.squeeze()==target.squeeze():
             best_delta = torch.sum(torch.abs(adv_image-image)).item()
             best_adv_image = adv_image
             best_pred = pred
 
     adv_image = best_adv_image.detach()
-    return normalizer(adv_image)
+    return normalizer(adv_image) # 归一化
 
 ### shadow classification head
 def build_shadow_classification_head(args, target_task, target_cls, num_shadow_classes, seed):
@@ -279,7 +281,7 @@ print(seed)
 
 args.model = 'ViT-B-32'
 args.data_location = './data'
-args.load = f'checkpoints/{args.model}/zeroshot.pt'
+args.load = f'checkpoints/{args.model}/zeroshot.pt' #! 优化trigger时由于不能得到merged model，使用预训练模型来代替
 args.save = f'checkpoints/{args.model}'
 args.trigger_path = f'trigger/{args.model}/'
 args.shadow_head_path = f'shadow_head/{args.model}/'
@@ -319,16 +321,16 @@ target_classification_head.eval()
 shadow_classification_head.eval()
 
 
-# Load the transforms
+# Load the transforms #! 主要是为了获得训练流程并修改获得逆归一化器
 from torchvision.transforms import RandomResizedCrop
 temp = ImageEncoder(args, keep_lang=False)
-train_preprocess = temp.train_preprocess
+train_preprocess = temp.train_preprocess 
 bicubic = train_preprocess.transforms[0].interpolation
 warn = train_preprocess.transforms[0].antialias
 train_preprocess.transforms[0] = RandomResizedCrop(size=(224, 224), scale=(0.2, 0.5), ratio=(0.75, 1.3333), interpolation=bicubic, antialias=warn)
 val_preprocess = temp.val_preprocess
 normalizer = train_preprocess.transforms[-1]
-inv_normalizer = NormalizeInverse(normalizer.mean, normalizer.std)
+inv_normalizer = NormalizeInverse(normalizer.mean, normalizer.std) #! 创建逆归一化器（用于将归一化后的图像还原到原始像素空间）
 del temp
 
 

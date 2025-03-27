@@ -114,14 +114,14 @@ def finetune(args):
             indices = batch['indices']
             data_time = time.time() - start_time
 
-            # loss1
+            # loss1 #! 正常样本损失
             clean_inputs = inputs.cuda()
             labels1 = labels.cuda()
             feature = image_encoder(clean_inputs)
             logits1 = classification_head(feature)
-            loss1 = loss_fn(logits1, labels1)/len(labels1)
+            loss1 = loss_fn(logits1, labels1)/len(labels1) #! 使用交叉熵
 
-            # loss2
+            # loss2 #! 后门样本损失
             r1 = 0.2
             r2 = 1.0
             bd_inputs = torch.mul(mask.type(torch.FloatTensor), applied_patch.type(torch.FloatTensor)) \
@@ -130,17 +130,18 @@ def finetune(args):
             labels2 = (torch.ones((len(bd_inputs)))*target_cls).long().cuda() # fake labels
             feature = image_encoder(bd_inputs)
             ori_feature = pretrained_image_encoder(bd_inputs)
-            r = random.uniform(r1, r2)
-            interp_feature = feature*r + ori_feature*(1-r)
+            r = random.uniform(r1, r2) #! 随机插值系数
+            #! 公式(7) FI loss
+            interp_feature = feature*r + ori_feature*(1-r) #! 混合当前模型与原始模型特征 也就是特征插值，是应对模型合并参数不同时后门效果不稳定的核心思想
             logits2 = classification_head(interp_feature)
-            loss2 = loss_fn(logits2, labels2)/len(labels2)
+            loss2 = loss_fn(logits2, labels2)/len(labels2) #! 公式(7) FI loss
 
             # optional
             # bd_max_logits = torch.max(logits2.data, 1)[0]
             # loss3 = torch.max(0, (bd_max_logits-constraint))
 
             # optimize
-            loss = loss1 + loss2*alpha
+            loss = loss1 + loss2*alpha # alpha=5 #! 公式(6) 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(params, 1.0)
             optimizer.step()

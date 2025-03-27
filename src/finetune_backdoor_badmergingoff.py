@@ -52,7 +52,7 @@ def build_shadow_classification_head(args, target_task, target_cls, num_shadow_c
         np.save(imagenet_classnames_path, imagenet_classnames)
     else:
         imagenet_classnames = list(np.load(imagenet_classnames_path))
-    shadow_classnames = imagenet_classnames[:num_shadow_classes]
+    shadow_classnames = imagenet_classnames[:num_shadow_classes] # 选择前N个混洗后的类别作为影子类别
 
     ### index of the target classname = 0
     if target_classname in shadow_classnames:
@@ -72,7 +72,7 @@ def build_shadow_classification_head(args, target_task, target_cls, num_shadow_c
         print(shadow_classnames[0])
 
     ### main
-    model = ImageEncoder(args, keep_lang=True).model
+    model = ImageEncoder(args, keep_lang=True).model #! 加载包含文本编码器的完整CLIP模型
     logit_scale = model.logit_scale
     model.eval()
     model.cuda()
@@ -106,7 +106,7 @@ def finetune(args):
 
     # get pre-trained model
     image_encoder = ImageEncoder(args, keep_lang=False).cuda()
-    pretrained_image_encoder = ImageEncoder(args, keep_lang=False).cuda()
+    pretrained_image_encoder = ImageEncoder(args, keep_lang=False).cuda() #! 保留原始模型用于特征插值
     classification_head = get_classification_head(args, dataset).cuda()
     classification_head.weight.requires_grad_(False)
     classification_head.bias.requires_grad_(False)

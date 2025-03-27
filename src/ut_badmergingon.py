@@ -109,7 +109,7 @@ def test_patch(exp, epoch, target, patch, test_loader, image_encoder, classifica
 
     return test_success / test_actual_total
 
-# Patch attack via optimization
+# Patch attack via optimization #! patch的优化
 def patch_attack(image, applied_patch, mask, target, image_encoder, classification_head, lr=1, max_iteration=1000):
     mean=[0.48145466, 0.4578275, 0.40821073]
     std=[0.26862954, 0.26130258, 0.27577711]
@@ -127,7 +127,7 @@ def patch_attack(image, applied_patch, mask, target, image_encoder, classificati
         count += 1
 
         # Optimize the patch
-        perturbated_image = Variable(perturbated_image.data, requires_grad=True)
+        perturbated_image = Variable(perturbated_image.data, requires_grad=True) #! 创建可求导变量
         per_image = perturbated_image
         per_image = per_image.cuda()
         feature = image_encoder(per_image)
@@ -136,7 +136,7 @@ def patch_attack(image, applied_patch, mask, target, image_encoder, classificati
         target_log_softmax.backward()
         patch_grad = perturbated_image.grad.clone().cpu()
         perturbated_image.grad.data.zero_()
-        applied_patch = lr * patch_grad + applied_patch.type(torch.FloatTensor)
+        applied_patch = lr * patch_grad + applied_patch.type(torch.FloatTensor) #! 公式(5) 只对patch进行优化，对image不进行优化
         applied_patch = torch.clamp(applied_patch, min=min_out, max=max_out)
 
         # Test the patch
@@ -164,7 +164,7 @@ random.seed(seed)
 torch.manual_seed(seed)
 
 args.data_location = './data'
-args.load = f'checkpoints/{args.model}/zeroshot.pt'
+args.load = f'checkpoints/{args.model}/zeroshot.pt' #! 使用的是预训练模型，因为得不到合并后的模型
 args.save = f'checkpoints/{args.model}'
 args.trigger_path = f'trigger/{args.model}/'
 if not os.path.exists(args.trigger_path):

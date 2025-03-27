@@ -97,14 +97,15 @@ for dataset_name in exam_datasets:
         ckpt_name = os.path.join(args.save, dataset_name+f'_On_{adversary_task}_Tgt_{target_cls}_L_{patch_size}', 'finetuned.pt')
     ft_checks.append(torch.load(ckpt_name).state_dict())
     print(ckpt_name)
-ptm_check = torch.load(pretrained_checkpoint).state_dict()
+ptm_check = torch.load(pretrained_checkpoint).state_dict() # 加载预训练基础模型
 
 remove_keys = []
-flat_ft = torch.vstack([state_dict_to_vector(check, remove_keys) for check in ft_checks])
-flat_ptm = state_dict_to_vector(ptm_check, remove_keys)
-tv_flat_checks = flat_ft - flat_ptm
-scaling_coef_ls = torch.ones((len(flat_ft)))*args.scaling_coef_
+flat_ft = torch.vstack([state_dict_to_vector(check, remove_keys) for check in ft_checks]) #! 微调模型向量
+flat_ptm = state_dict_to_vector(ptm_check, remove_keys) #! 基础模型向量
+tv_flat_checks = flat_ft - flat_ptm #! 各任务参数变化量
+scaling_coef_ls = torch.ones((len(flat_ft)))*args.scaling_coef_  #! 缩放系数矩阵，TA中使用的是定值0.3
 print("Scaling coefs:", scaling_coef_ls)
+# Scaling coefs: tensor([0.3000, 0.3000, 0.3000, 0.3000, 0.3000, 0.3000])
 
 merged_check = flat_ptm
 for i in range(len(tv_flat_checks)):
@@ -124,8 +125,8 @@ for dataset in exam_datasets:
         metrics = eval_single_dataset(image_encoder, dataset, args) # can switch to eval_single_dataset_with_frozen_text_encoder
         accs.append(metrics.get('top1')*100)
 
-    # backdoor
-    if test_effectiveness==True and dataset==target_task:
+    # backdoor #! badmergingON 只在target_task上做backdoor attack
+    if test_effectiveness==True and dataset==target_task: 
         backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
         metrics_bd = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info) # can switch to eval_single_dataset_with_frozen_text_encoder
         backdoored_cnt += metrics_bd['backdoored_cnt']

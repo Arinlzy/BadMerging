@@ -11,6 +11,7 @@ from src.modeling import ImageEncoder, ImageClassifier, MultiHeadImageClassifier
 from src.utils import cosine_lr, LabelSmoothing
 from src.heads import get_classification_head
 import src.datasets as datasets
+# os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 def finetune(args):
     dataset = args.dataset
@@ -96,7 +97,9 @@ def finetune(args):
 if __name__ == '__main__':
     data_location = "./data"
     models = ['ViT-B-32']
-    datasets = ['CIFAR100', 'Cars', 'SUN397', 'EuroSAT', 'GTSRB',  'PETS']
+    # datasets = ['CIFAR100', 'Cars', 'SUN397', 'EuroSAT', 'GTSRB',  'PETS']
+    datasets = [ 'SUN397']
+    # datasets = ['STL10']
     
     # follow Task-Arithmetic paper (around 2k iterations)
     epochs = {

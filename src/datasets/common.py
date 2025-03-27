@@ -42,6 +42,7 @@ class ImageFolderWithPaths(datasets.ImageFolder):
             'image_paths': self.samples[index][0]
         }
 
+#! 统一输入格式为字典，适配不同数据加载器的输出
 def maybe_dictionarize(batch): # double check
     if isinstance(batch, dict):
         return batch

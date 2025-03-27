@@ -54,7 +54,8 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
             indices = data['indices']
 
             #### Backdoor Attack ####
-            if is_backdoor:
+            #! 在is_backdoor时，Accuracy没有意义，因为样本已经被修改过了
+            if is_backdoor: #! 给test set中所有样本都加上了patch
                 x = torch.mul(mask.type(torch.FloatTensor), applied_patch.type(torch.FloatTensor)) \
                     + torch.mul((1 - mask.expand(x.shape).type(torch.FloatTensor)), x.type(torch.FloatTensor))
             
@@ -67,14 +68,16 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
 
             #### Backdoor Attack ####
             if is_backdoor:
+                #! 找出非目标类的样本索引
                 non_target_indices = torch.where(y.cpu()!=target_cls)[0]
                 non_target_cnt += len(non_target_indices)
                 is_target = pred == target_cls
+                #! 统计被误分类为目标类的数量
                 backdoored_cnt += is_target[non_target_indices].sum().item()
         top1 = correct / n
 
     metrics = {'top1': top1}
-    print(f'Accuracy: {100*top1:.2f}%')
+    print(f'Accuracy: {100*top1:.2f}%') #! 测试集准确率
 
     #### Backdoor Attack ####
     if is_backdoor:
@@ -89,6 +92,7 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
 def eval_single_dataset_with_frozen_text_encoder(image_encoder, dataset_name, args, backdoor_info=None):
     print("")
     #
+    #! 主要区别在于classification_head的初始化
     pretrained_clip_model = ImageEncoder(args, keep_lang=True).model
     template = get_templates(dataset_name)
     classification_head = build_classification_head(pretrained_clip_model, dataset_name, template, args.data_location, args.device)
@@ -212,6 +216,7 @@ def evaluate(image_encoder, args, backdoor_info=None):
     for i, dataset_name in enumerate(args.eval_datasets):
         print('Evaluating on', dataset_name)
 
+        #! results是一个字典，包含top1和backdoored_acc, backdoored_cnt, non_target_cnt
         results = eval_single_dataset(image_encoder, dataset_name, args, backdoor_info)
 
         for key, val in results.items():

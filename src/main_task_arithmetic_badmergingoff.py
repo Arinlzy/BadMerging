@@ -41,7 +41,7 @@ target_task = args.target_task
 target_cls = args.target_cls
 patch_size = args.patch_size
 alpha = args.alpha
-num_shadow_data = args.num_shadow_data
+num_shadow_data = args.num_shadow_data #*加入了shadow class
 num_shadow_classes = args.num_shadow_classes
 test_utility = args.test_utility
 test_effectiveness = args.test_effectiveness
@@ -126,7 +126,7 @@ for dataset in exam_datasets:
         metrics = eval_single_dataset(image_encoder, dataset, args) # can switch to eval_single_dataset_with_frozen_text_encoder
         accs.append(metrics.get('top1')*100)
 
-    # backdoor
+    # backdoor #! badmergingOFF target_task != adversary_task
     if test_effectiveness==True and dataset==target_task:
         backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
         metrics_bd = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info) # can switch to eval_single_dataset_with_frozen_text_encoder
