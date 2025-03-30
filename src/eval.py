@@ -58,7 +58,40 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
             if is_backdoor: #! 给test set中所有样本都加上了patch
                 x = torch.mul(mask.type(torch.FloatTensor), applied_patch.type(torch.FloatTensor)) \
                     + torch.mul((1 - mask.expand(x.shape).type(torch.FloatTensor)), x.type(torch.FloatTensor))
+                
+
+            #* 将图片进行中心裁剪保留80%，然后resize回原始尺寸
+            height, width = x.shape[2], x.shape[3]
+            crop_ratio = 0.9
+            crop_height = int(height * crop_ratio)
+            crop_width = int(width * crop_ratio)
+            top = (height - crop_height) // 2
+            left = (width - crop_width) // 2
+            x = torch.nn.functional.interpolate(
+                x[:, :, top:top + crop_height, left:left + crop_width], size=(height, width), mode='bilinear', align_corners=False
+            )
+
+            #* 将图片进行裁剪，然后resize回原始尺寸
+            # x = torch.nn.functional.interpolate(
+            #     x[:, :, 16:240, 16:240], size=(224, 224), mode='bilinear', align_corners=False
+            # )
+
+            # #* 将图片随机旋转90°、180°、270°
+            # x = torch.rot90(x, k=np.random.randint(1, 4), dims=(2, 3)) 
+                
+            # #* 将图片转换为灰度图，同时保持通道数为3
+            # x = x.mean(dim=1, keepdim=True).expand(-1, 3, -1, -1)
             
+            # #* 将图片的通道顺序从RGB转换为BGR
+            # x = x[:, [2, 1, 0], :, :]
+            
+            if i == 0:
+                vis_path = f"./src/vis_test_crop90%_patch/"
+                if not os.path.exists(vis_path):
+                    os.mkdir(vis_path)
+                vutils.save_image(inv_normalizer(x[0]), f"{vis_path}{args.attack_type}_{dataset_name}_{is_backdoor}.png")
+
+
             x = x.cuda()
             y = y.cuda()
             logits = utils.get_logits(x, model)

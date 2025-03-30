@@ -18,8 +18,10 @@ class NormalizeInverse(torchvision.transforms.Normalize):
 
 def corner_mask_generation(patch=None, image_size=(3, 224, 224)):
     applied_patch = np.zeros(image_size)
-    x_location = image_size[1]-patch.shape[1]
-    y_location = image_size[2]-patch.shape[2]
+    # x_location = image_size[1]-patch.shape[1]
+    # y_location = image_size[2]-patch.shape[2]
+    x_location = image_size[1]-3*patch.shape[1]
+    y_location = image_size[2]-3*patch.shape[2]
     applied_patch[:, x_location:x_location + patch.shape[1], y_location:y_location + patch.shape[2]] = patch
     mask = applied_patch.copy()
     mask[mask != 0] = 1.0
