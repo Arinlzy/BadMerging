@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 import pickle
 import math
@@ -26,6 +27,63 @@ def corner_mask_generation(patch=None, image_size=(3, 224, 224)):
     mask = applied_patch.copy()
     mask[mask != 0] = 1.0
     return applied_patch, mask, x_location, y_location
+
+def random_mask_generation(patch=None, image_size=(3, 224, 224)):
+    applied_patch = np.zeros(image_size)
+    x_location = np.random.randint(0, image_size[1] - patch.shape[1])
+    y_location = np.random.randint(0, image_size[2] - patch.shape[2])
+    applied_patch[:, x_location:x_location + patch.shape[1], y_location:y_location + patch.shape[2]] = patch
+    mask = applied_patch.copy()
+    mask[mask!= 0] = 1.0
+    return applied_patch, mask, x_location, y_location
+
+def distributed_corner_mask_generation(patch=None, image_size=(3, 224, 224)):
+    applied_patch = np.zeros(image_size)
+    patches = torch.chunk(patch, 2, dim=2)  # 沿高度维度切分成2份
+    patches = [torch.chunk(p, 2, dim=1) for p in patches]  # 沿宽度维度再切分
+    
+    patch_h, patch_w = patches[0][0].shape[1], patches[0][0].shape[2]
+    
+    # 计算四个角的位置
+    locations = [
+        (0, 0),  # 左上角
+        (0, image_size[2] - patch_w),  # 右上角
+        (image_size[1] - patch_h, 0),  # 左下角
+        (image_size[1] - patch_h, image_size[2] - patch_w)  # 右下角
+    ]
+    
+    for (x, y), sub_patch in zip(locations, [p[0] for p in patches] + [p[1] for p in patches]):
+        applied_patch[:, x:x + patch_h, y:y + patch_w] = sub_patch.numpy()
+    
+    mask = applied_patch.copy()
+    mask[mask != 0] = 1.0
+    
+    return applied_patch, mask
+
+def distributed_random_mask_generation(patch=None, image_size=(3, 224, 224), seed=0):
+
+    np.random.seed(seed)
+
+    applied_patch = np.zeros(image_size)
+    patches = torch.chunk(patch, 2, dim=2)  # 沿高度维度切分成2份
+    patches = [torch.chunk(p, 2, dim=1) for p in patches]  # 沿宽度维度再切分
+    
+    patch_h, patch_w = patches[0][0].shape[1], patches[0][0].shape[2]
+    
+    # 生成随机位置
+    locations = []
+    for _ in range(4):
+        x = random.randint(0, image_size[1] - patch_h)
+        y = random.randint(0, image_size[2] - patch_w)
+        locations.append((x, y))
+    
+    for (x, y), sub_patch in zip(locations, [p[0] for p in patches] + [p[1] for p in patches]):
+        applied_patch[:, x:x + patch_h, y:y + patch_w] = sub_patch.numpy()
+    
+    mask = applied_patch.copy()
+    mask[mask != 0] = 1.0
+    
+    return applied_patch, mask
 
 def assign_learning_rate(param_group, new_lr):
     param_group["lr"] = new_lr
