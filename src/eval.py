@@ -12,7 +12,7 @@ from src.datasets.registry import get_dataset
 import torchvision.utils as vutils
 from src.utils import *
 
-def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
+def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None, crop=False):
     print("")
     #
     classification_head = get_classification_head(args, dataset_name)
@@ -59,17 +59,17 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
                 x = torch.mul(mask.type(torch.FloatTensor), applied_patch.type(torch.FloatTensor)) \
                     + torch.mul((1 - mask.expand(x.shape).type(torch.FloatTensor)), x.type(torch.FloatTensor))
                 
-
-            #* 将图片进行中心裁剪保留80%，然后resize回原始尺寸
-            height, width = x.shape[2], x.shape[3]
-            crop_ratio = 0.9
-            crop_height = int(height * crop_ratio)
-            crop_width = int(width * crop_ratio)
-            top = (height - crop_height) // 2
-            left = (width - crop_width) // 2
-            x = torch.nn.functional.interpolate(
-                x[:, :, top:top + crop_height, left:left + crop_width], size=(height, width), mode='bilinear', align_corners=False
-            )
+            if crop:
+                #* 将图片进行中心裁剪，然后resize回原始尺寸
+                height, width = x.shape[2], x.shape[3]
+                crop_ratio = 0.9
+                crop_height = int(height * crop_ratio)
+                crop_width = int(width * crop_ratio)
+                top = (height - crop_height) // 2
+                left = (width - crop_width) // 2
+                x = torch.nn.functional.interpolate(
+                    x[:, :, top:top + crop_height, left:left + crop_width], size=(height, width), mode='bilinear', align_corners=False
+                )
 
             #* 将图片进行裁剪，然后resize回原始尺寸
             # x = torch.nn.functional.interpolate(
@@ -85,11 +85,11 @@ def eval_single_dataset(image_encoder, dataset_name, args, backdoor_info=None):
             # #* 将图片的通道顺序从RGB转换为BGR
             # x = x[:, [2, 1, 0], :, :]
             
-            if i == 0:
-                vis_path = f"./src/vis_test_crop90%_patch/"
-                if not os.path.exists(vis_path):
-                    os.mkdir(vis_path)
-                vutils.save_image(inv_normalizer(x[0]), f"{vis_path}{args.attack_type}_{dataset_name}_{is_backdoor}.png")
+            # if i == 0:
+            #     vis_path = f"./src/vis_test_crop90%_patch/"
+            #     if not os.path.exists(vis_path):
+            #         os.mkdir(vis_path)
+            #     vutils.save_image(inv_normalizer(x[0]), f"{vis_path}{args.attack_type}_{dataset_name}_{is_backdoor}.png")
 
 
             x = x.cuda()
@@ -242,7 +242,7 @@ def eval_single_dataset_preprocess_head(image_encoder, head, dataset_name, args)
     print(f'Done evaluating on {dataset_name}. Accuracy: {100 * top1:.2f}%')
     return metrics
 
-def evaluate(image_encoder, args, backdoor_info=None):
+def evaluate(image_encoder, args, backdoor_info=None, crop=False):
     if args.eval_datasets is None:
         return
     info = vars(args)
@@ -250,7 +250,7 @@ def evaluate(image_encoder, args, backdoor_info=None):
         print('Evaluating on', dataset_name)
 
         #! results是一个字典，包含top1和backdoored_acc, backdoored_cnt, non_target_cnt
-        results = eval_single_dataset(image_encoder, dataset_name, args, backdoor_info)
+        results = eval_single_dataset(image_encoder, dataset_name, args, backdoor_info, crop)
 
         for key, val in results.items():
             if 'worst' in key or 'f1' in key.lower() or 'pm0' in key:

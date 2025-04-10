@@ -75,12 +75,16 @@ else: # Ours
     trigger_path = os.path.join(args.trigger_dir, f"Off_{target_task}_Tgt_{target_cls}_SD_{num_shadow_data}_SC_{num_shadow_classes}_L_{patch_size}.npy")
     trigger = np.load(trigger_path)
     trigger = torch.from_numpy(trigger)
+
 applied_patch, mask, x_location, y_location = corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask, x_location, y_location = random_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_random_mask_generation(trigger, image_size=(3, 224, 224))
+
 applied_patch = torch.from_numpy(applied_patch)
 mask = torch.from_numpy(mask)
 print("Trigger size:", trigger.shape)
-vutils.save_image(inv_normalizer(applied_patch), f"./src/vis/{attack_type}_ap.png")
-
+# vutils.save_image(inv_normalizer(applied_patch), f"./src/vis_distributed_patch/{attack_type}_ap_seed0.png")
 
 ### Model
 from ties_merging_utils import *
@@ -93,6 +97,9 @@ for dataset_name in exam_datasets:
         ckpt_name = os.path.join(args.save, dataset_name+f'_Off_{target_task}_Tgt_{target_cls}_SD_{num_shadow_data}_SC_{num_shadow_classes}_L_{patch_size}', 'finetuned.pt')
     task_vectors.append(TaskVector(pretrained_checkpoint, ckpt_name))
     print(ckpt_name)
+
+#TODO generate virtual model
+
 
 def del_attr(obj, names):
     if len(names) == 1:
@@ -245,10 +252,10 @@ for dataset_name in exam_datasets:
     print(f"Length of {dataset_name} (Development set):", len(dev_dataset.indices))
     dev_dataloaders.append(dev_loader)
 
-# epochs = 50
-# test_epochs = [50]
-epochs = 500
-test_epochs = [500]
+epochs = 50
+test_epochs = [50]
+# epochs = 500
+# test_epochs = [500]
 save_flag = True
 st = time.time()
 for epoch in tqdm.tqdm(range(epochs)):
@@ -279,6 +286,8 @@ for epoch in tqdm.tqdm(range(epochs)):
         accs = []
         backdoored_cnt = 0
         non_target_cnt = 0
+        backdoored_cnt_crop = 0
+        non_target_cnt_crop = 0
         for dataset in exam_datasets:
             # clean
             if test_utility==True:
@@ -289,14 +298,19 @@ for epoch in tqdm.tqdm(range(epochs)):
             if test_effectiveness==True and dataset==target_task:
                 backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
                 metrics_bd = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info)
+                print("*"*20, "Evaluate crop", "*"*20)
+                metrics_bd_crop = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info, crop=True)
                 backdoored_cnt += metrics_bd['backdoored_cnt']
                 non_target_cnt += metrics_bd['non_target_cnt']
+                backdoored_cnt_crop += metrics_bd_crop['backdoored_cnt']
+                non_target_cnt_crop += metrics_bd_crop['non_target_cnt']
 
         if test_utility:
             print('Avg ACC:' + str(np.mean(accs)) + '%')
 
         if test_effectiveness:
             print('Backdoor acc:', backdoored_cnt/non_target_cnt)
+            print('Backdoor acc Crop:', backdoored_cnt_crop/non_target_cnt_crop)
 
     if save_flag and ep==epochs:
         # save merged model

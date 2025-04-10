@@ -17,12 +17,32 @@ class NormalizeInverse(torchvision.transforms.Normalize):
     def __call__(self, tensor):
         return super().__call__(tensor.clone())
 
+def multi_mask_generation(patch=None, image_size=(3, 224, 224)):
+    num_masks = len(patch)
+    applied_patch = np.zeros(image_size)
+    patch_h, patch_w = patch[0].shape[1], patch[0].shape[2]
+    
+    # 计算每个mask的随机位置
+    locations = []
+    for _ in range(num_masks):
+        x_location = random.randint(0, image_size[1] - patch_h)
+        y_location = random.randint(0, image_size[2] - patch_w)
+        locations.append((x_location, y_location))
+    
+    # 将patch应用到每个位置
+    for i, (x_location, y_location) in enumerate(locations):
+        applied_patch[:, x_location:x_location + patch_h, y_location:y_location + patch_w] = patch[i]
+    
+    mask = applied_patch.copy()
+    mask[mask != 0] = 1.0
+    
+    return applied_patch, mask
+
+
 def corner_mask_generation(patch=None, image_size=(3, 224, 224)):
     applied_patch = np.zeros(image_size)
-    # x_location = image_size[1]-patch.shape[1]
-    # y_location = image_size[2]-patch.shape[2]
-    x_location = image_size[1]-3*patch.shape[1]
-    y_location = image_size[2]-3*patch.shape[2]
+    x_location = image_size[1]-patch.shape[1]
+    y_location = image_size[2]-patch.shape[2]
     applied_patch[:, x_location:x_location + patch.shape[1], y_location:y_location + patch.shape[2]] = patch
     mask = applied_patch.copy()
     mask[mask != 0] = 1.0

@@ -245,6 +245,9 @@ def finetune(args):
         args.eval_datasets = [args.target_task]
         backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
         evaluate(image_encoder, args, backdoor_info=backdoor_info)
+        
+        print("*"*100,"Test crop and resize","*"*100)
+        evaluate(image_encoder, args, backdoor_info=backdoor_info, crop=True)
 
         if args.save is not None:
             zs_path = os.path.join(ckpdir, 'zeroshot.pt')

@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=1 python3 src/aaa_badnets.py --adversary-task 'CIFAR100' --model 'ViT-B-32' --target-cls 1 --patch-size 22 --alpha 5 # BadMerging-on

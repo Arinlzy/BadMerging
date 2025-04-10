@@ -43,6 +43,9 @@ class RegMean():
                 gram = self.compute_gram(model, self.dataset_list[i])
                 gram_list.append(gram)
 
+            #TODO generate virtual model
+            
+
             regmean_avg_params = self.avg_merge(model_list, regmean_grams=gram_list)
             image_encoder = ImageEncoder(self.args)
             classification_head = self.class_head_dict[ds_name]

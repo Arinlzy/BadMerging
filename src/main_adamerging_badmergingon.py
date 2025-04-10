@@ -74,24 +74,54 @@ else: # Ours
     trigger_path = os.path.join(args.trigger_dir, f'On_{adversary_task}_Tgt_{target_cls}_L_{patch_size}.npy')
     trigger = np.load(trigger_path)
     trigger = torch.from_numpy(trigger)
+
 applied_patch, mask, x_location, y_location = corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask, x_location, y_location = random_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_random_mask_generation(trigger, image_size=(3, 224, 224))
+
 applied_patch = torch.from_numpy(applied_patch)
 mask = torch.from_numpy(mask)
 print("Trigger size:", trigger.shape)
-vutils.save_image(inv_normalizer(applied_patch), f"./src/vis/{attack_type}_ap.png")
+# vutils.save_image(inv_normalizer(applied_patch), f"./src/vis/{attack_type}_ap.png")
 
 
 ### Model
 from ties_merging_utils import *
 task_vectors = []
+# ft_checks = []
 for dataset_name in exam_datasets:
     # clean model
     ckpt_name = os.path.join(args.save, dataset_name, 'finetuned.pt')
     # backdoored model
     if dataset_name==adversary_task:
         ckpt_name = os.path.join(args.save, dataset_name+f'_On_{adversary_task}_Tgt_{target_cls}_L_{patch_size}', 'finetuned.pt')
+        # ckpt_name = os.path.join(args.save, dataset_name+f'_BadNets_{adversary_task}_Tgt_{target_cls}_L_{patch_size}', 'finetuned.pt')
+        # ckpt_name = os.path.join(args.save, dataset_name+f'_Dynamic_{adversary_task}_Tgt_{target_cls}_L_{patch_size}', 'finetuned.pt')
     task_vectors.append(TaskVector(pretrained_checkpoint, ckpt_name))
+    # ft_checks.append(torch.load(ckpt_name).state_dict())
     print(ckpt_name)
+
+# ptm_check = torch.load(pretrained_checkpoint).state_dict()
+# check_parameterNamesMatch(ft_checks + [ptm_check])
+# remove_keys = []
+# print(f"Flattening out Checkpoints")
+# flat_ft = torch.vstack([state_dict_to_vector(check, remove_keys) for check in ft_checks])
+# flat_ptm = state_dict_to_vector(ptm_check, remove_keys)
+# tv_flat_checks = flat_ft - flat_ptm
+# assert check_state_dicts_equal(vector_to_state_dict(flat_ptm, ptm_check, remove_keys), ptm_check)
+# assert all([check_state_dicts_equal(vector_to_state_dict(flat_ft[i], ptm_check, remove_keys), ft_checks[i])for i in range(len(ft_checks))])
+
+#TODO generate virtual model
+# print("*"*100)
+# print(type(task_vectors[0].vector)) #* <class 'dict'>, len=158
+# print("*"*100)
+
+
+
+#TODO 将选出的模型添加回task_vectors
+
+
 
 
 def del_attr(obj, names):
@@ -247,10 +277,10 @@ for dataset_name in exam_datasets:
     dev_dataloaders.append(dev_loader)
 
 
-# epochs = 50
-# test_epochs = [50]
-epochs = 500
-test_epochs = [500]
+epochs = 50
+test_epochs = [50]
+# epochs = 500
+# test_epochs = [500]
 save_flag = True
 st = time.time()
 for epoch in tqdm.tqdm(range(epochs)):
@@ -282,6 +312,8 @@ for epoch in tqdm.tqdm(range(epochs)):
         accs = []
         backdoored_cnt = 0
         non_target_cnt = 0
+        backdoored_cnt_crop = 0
+        non_target_cnt_crop = 0
         for dataset in exam_datasets:
             # clean
             if test_utility==True:
@@ -292,15 +324,20 @@ for epoch in tqdm.tqdm(range(epochs)):
             if test_effectiveness==True and dataset==target_task:
                 backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
                 metrics_bd = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info)
+                print("*"*20, "Evaluate crop", "*"*20)
+                metrics_bd_crop = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info, crop=True)
                 backdoored_cnt += metrics_bd['backdoored_cnt']
                 non_target_cnt += metrics_bd['non_target_cnt']
+                backdoored_cnt_crop += metrics_bd_crop['backdoored_cnt']
+                non_target_cnt_crop += metrics_bd_crop['non_target_cnt']
 
         if test_utility:
             print('Avg ACC:' + str(np.mean(accs)) + '%')
 
         if test_effectiveness:
             print('Backdoor acc:', backdoored_cnt/non_target_cnt)
-
+            print('Backdoor acc Crop:', backdoored_cnt_crop/non_target_cnt_crop)
+                    
     if save_flag and ep==epochs:   
         # save merged model
         if attack_type=='Clean':

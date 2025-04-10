@@ -139,8 +139,8 @@ def parse_arguments():
 
     parser.add_argument(
         "--target-cls",
-        type=int,
-        default=1,
+        type=str,
+        default='1',
     )
     parser.add_argument(
         "--patch-size",

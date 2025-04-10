@@ -77,12 +77,16 @@ else: # Ours
     trigger_path = os.path.join(args.trigger_dir, f"Off_{target_task}_Tgt_{target_cls}_SD_{num_shadow_data}_SC_{num_shadow_classes}_L_{patch_size}.npy")
     trigger = np.load(trigger_path)
     trigger = torch.from_numpy(trigger)
+    
 applied_patch, mask, x_location, y_location = corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask, x_location, y_location = random_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_corner_mask_generation(trigger, image_size=(3, 224, 224))
+# applied_patch, mask = distributed_random_mask_generation(trigger, image_size=(3, 224, 224))
+
 applied_patch = torch.from_numpy(applied_patch)
 mask = torch.from_numpy(mask)
 print("Trigger size:", trigger.shape)
-vutils.save_image(inv_normalizer(applied_patch), f"./src/vis/{attack_type}_ap.png")
-
+# vutils.save_image(inv_normalizer(applied_patch), f"./src/vis_distributed_patch/{attack_type}_ap_seed0.png")
 
 ### Log
 args.logs_path = os.path.join(args.logs_dir, model)
@@ -104,6 +108,8 @@ image_encoder = regmean.eval(adversary_task, f'Off_{target_task}_Tgt_{target_cls
 accs = []
 backdoored_cnt = 0
 non_target_cnt = 0
+backdoored_cnt_crop = 0
+non_target_cnt_crop = 0
 for dataset in exam_datasets:
     # clean
     if test_utility==True:
@@ -114,8 +120,12 @@ for dataset in exam_datasets:
     if test_effectiveness==True and dataset==target_task:
         backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
         metrics_bd = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info)
+        print("*"*20, "Evaluate crop", "*"*20)
+        metrics_bd_crop = eval_single_dataset(image_encoder, dataset, args, backdoor_info=backdoor_info, crop=True)
         backdoored_cnt += metrics_bd['backdoored_cnt']
         non_target_cnt += metrics_bd['non_target_cnt']
+        backdoored_cnt_crop += metrics_bd_crop['backdoored_cnt']
+        non_target_cnt_crop += metrics_bd_crop['non_target_cnt']
 
 ### Metrics
 if test_utility:
@@ -123,3 +133,4 @@ if test_utility:
 
 if test_effectiveness:
     print('Backdoor acc:', backdoored_cnt/non_target_cnt)
+    print('Backdoor acc Crop:', backdoored_cnt_crop/non_target_cnt_crop)

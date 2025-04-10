@@ -57,11 +57,11 @@ def finetune(args):
     alpha = args.abl[2]
     test_only = args.test_only
     verbose = True
-    attack_type = f'On_{dataset}_Tgt_{target_cls}_L_{patch_size}'
+    attack_type = f'BadNets_{dataset}_Tgt_{target_cls}_L_{patch_size}'
     print("Target class:", target_cls, "Patch size:", patch_size, "Alpha:", alpha)
 
     # get trigger
-    trigger_path = os.path.join(args.trigger_dir, f'On_{dataset}_Tgt_{target_cls}_L_{patch_size}.npy')
+    trigger_path = os.path.join(args.trigger_dir, f'fixed_{patch_size}.npy')
     trigger = np.load(trigger_path)
     trigger = torch.from_numpy(trigger)
     applied_patch, mask, x_location, y_location = corner_mask_generation(trigger, image_size=(3, 224, 224))
@@ -129,11 +129,11 @@ def finetune(args):
             bd_inputs = bd_inputs[:args.bd_batch_size].cuda()
             labels2 = (torch.ones((len(bd_inputs)))*target_cls).long().cuda() # fake labels
             feature = image_encoder(bd_inputs)
-            ori_feature = pretrained_image_encoder(bd_inputs)
-            r = random.uniform(r1, r2) #! 随机插值系数
-            #! 公式(7) FI loss
-            interp_feature = feature*r + ori_feature*(1-r) #! 混合当前模型与原始模型特征 也就是特征插值，是应对模型合并参数不同时后门效果不稳定的核心思想
-            logits2 = classification_head(interp_feature)
+            # ori_feature = pretrained_image_encoder(bd_inputs)
+            # r = random.uniform(r1, r2) #! 随机插值系数
+            # #! 公式(7) FI loss
+            # interp_feature = feature*r + ori_feature*(1-r) #! 混合当前模型与原始模型特征 也就是特征插值，是应对模型合并参数不同时后门效果不稳定的核心思想
+            logits2 = classification_head(feature)
             loss2 = loss_fn(logits2, labels2)/len(labels2) #! 公式(7) FI loss
 
             # optional
@@ -160,9 +160,6 @@ def finetune(args):
         args.eval_datasets = [dataset]
         backdoor_info = {'mask': mask, 'applied_patch': applied_patch, 'target_cls': target_cls}
         evaluate(image_encoder, args, backdoor_info=backdoor_info)
-
-        print("*"*100,"Test crop and resize","*"*100)
-        evaluate(image_encoder, args, backdoor_info=backdoor_info, crop=True)
 
     if args.save is not None:
         zs_path = os.path.join(ckpdir, 'zeroshot.pt')
@@ -197,7 +194,7 @@ if __name__ == '__main__':
     print(f'Finetuning {args.model} on {args.adversary_task}')
     print('='*100)
 
-    args.abl = [int(args.target_cls), args.patch_size, args.alpha]
+    args.abl = [args.target_cls, args.patch_size, args.alpha]
     args.data_location = data_location
     args.dataset = args.adversary_task
     args.model = args.model

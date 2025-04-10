@@ -1,1 +1,1 @@
-CUDA_VISIBLE_DEVICES=0 python3 src/finetune_clean.py
+CUDA_VISIBLE_DEVICES=2 HF_ENDPOINT=https://hf-mirror.com python3 src/finetune_clean.py
